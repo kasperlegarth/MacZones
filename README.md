@@ -13,16 +13,40 @@ En macOS-udgave af FancyZones fra PowerToys: definer zoner på dine skærme og s
 
 ## Installér
 
-Kræver macOS 14+ og Xcode / Swift 6.
+Kræver macOS 14 (Sonoma) eller nyere og Xcode 16 eller nyere (installeres fra App Store).
+
+### Med Claude Code
 
 ```bash
+git clone https://github.com/kasperlegarth/MacZones.git
+cd MacZones
+claude
+```
+
+Skriv så **"Installér MacZones"**. Claude tjekker forudsætningerne, bygger og installerer appen og guider dig igennem tilladelsen til
+Tilgængelighed. Instruktionerne til Claude ligger i [`CLAUDE.md`](CLAUDE.md).
+
+### Manuelt
+
+```bash
+git clone https://github.com/kasperlegarth/MacZones.git
+cd MacZones
 ./scripts/create-signing-cert.sh   # kun første gang
 ./scripts/install.sh               # bygger og installerer i /Applications
 ```
 
+### Opdatering
+
+```bash
+git pull
+./scripts/install.sh
+```
+
+Tilladelser og indstillinger bevares.
+
 MacZones starter automatisk ved login, første gang den kører fra `/Applications`. Det kan slås fra i menuen eller under Indstillinger.
 
-Andre scripts:
+### Andre scripts
 
 | Script | Gør |
 | --- | --- |
@@ -30,13 +54,27 @@ Andre scripts:
 | `scripts/make-dmg.sh` | Laver `build/MacZones-<version>.dmg` til deling |
 | `scripts/make-icon.sh` | Genererer `Resources/AppIcon.icns` fra `scripts/make-icon.swift` |
 
+### Tilladelse
+
 Første gang skal appen have adgang under **Systemindstillinger → Anonymitet og sikkerhed → Tilgængelighed**.
+Uden den kan den ikke flytte vinduer, og der sker ingenting, når du trækker.
 
 > `create-signing-cert.sh` laver et lokalt, selvsigneret certifikat ("MacZones Dev") i din login-nøglering. Uden det bliver appen
 > ad-hoc-signeret, og så "glemmer" macOS tilladelsen ved hver build, selvom kontakten stadig står tændt.
 > Hvis det er sket, så kør `tccutil reset Accessibility com.kasperlegarth.MacZones` og giv tilladelsen igen.
 
 Indstillinger gemmes i `~/Library/Application Support/MacZones/config.json`.
+
+## Afinstallér
+
+```bash
+pkill -x MacZones; rm -rf /Applications/MacZones.app
+tccutil reset Accessibility com.kasperlegarth.MacZones
+rm -rf ~/Library/Application\ Support/MacZones           # valgfrit: slet layouts og indstillinger
+security delete-certificate -c "MacZones Dev"            # valgfrit: slet signeringscertifikatet
+```
+
+Fjern også MacZones under **Systemindstillinger → Generelt → Login-emner**, hvis den stadig står der.
 
 ## Opbygning
 
