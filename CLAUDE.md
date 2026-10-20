@@ -69,8 +69,13 @@ prebuilt app needs an Apple Developer ID and notarization.
 - **Two coordinate systems.** Cocoa/`NSScreen` use a bottom-left origin; the Accessibility API uses top-left relative to
   the primary screen. Zone logic works in AX coordinates (`axFrame`, `axVisibleFrame`, `Geometry.mouseLocation`);
   convert with `Geometry.flip` only when positioning Cocoa windows.
-- Zones are normalized (0…1, top-left origin). The gap is applied in `LayoutStore.zoneRects(for:)`: the screen is inset
-  by gap/2, then each zone by gap/2, giving `gap` between zones and at the edges. The editor canvas mirrors this.
+- Zones are normalized (0…1, top-left origin). The gap is applied in `LayoutStore.zoneRect(_:in:spacing:)`: the screen
+  is inset by gap/2, then each zone by gap/2, giving `gap` between zones and at the edges. `LayoutStore.zone(for:in:spacing:id:)`
+  is its inverse (used by the px fields in the editor); keep the two in sync. The editor canvas mirrors the same math.
+- Editor drag gestures must measure in the canvas's named coordinate space (`"canvas"`). Measuring relative to the view
+  being dragged makes it jitter, because the view moves as it resizes.
+- `LayoutStore` saves are debounced (`scheduleSave`), since dragging in the editor changes the config many times a second.
+  Call `saveNow()` when a write must happen immediately.
 - Template layouts are read-only and have fixed UUIDs; per-layout gaps are stored in `Config.layoutSpacing` so they
   work for templates too.
 - Views that look up a layout by id must handle it being gone (deleting a layout re-renders before the selection changes).

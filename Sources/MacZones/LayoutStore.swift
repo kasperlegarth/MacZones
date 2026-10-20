@@ -6,10 +6,11 @@ final class LayoutStore: ObservableObject {
     static let shared = LayoutStore()
 
     @Published var config: Config {
-        didSet { save() }
+        didSet { scheduleSave() }
     }
 
     private let fileURL: URL
+    private var pendingSave: DispatchWorkItem?
 
     private init() {
         let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -25,7 +26,17 @@ final class LayoutStore: ObservableObject {
         }
     }
 
-    private func save() {
+    /// Coalesces rapid changes (e.g. dragging a zone in the editor) into one write.
+    private func scheduleSave() {
+        pendingSave?.cancel()
+        let work = DispatchWorkItem { [weak self] in self?.saveNow() }
+        pendingSave = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4, execute: work)
+    }
+
+    func saveNow() {
+        pendingSave?.cancel()
+        pendingSave = nil
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(config) else { return }
@@ -88,9 +99,29 @@ final class LayoutStore: ObservableObject {
     func zoneRects(for screen: NSScreen) -> [CGRect] {
         let layout = layout(for: screen)
         let spacing = spacing(for: layout.id)
-        let inner = screen.axVisibleFrame.insetBy(dx: spacing / 2, dy: spacing / 2)
-        return layout.zones.map { zone in
-            zone.rect(in: inner).insetBy(dx: spacing / 2, dy: spacing / 2).integral
-        }
+        return layout.zones.map { Self.zoneRect($0, in: screen.axVisibleFrame, spacing: spacing) }
+    }
+
+    /// The frame a window gets when snapped to `zone` on a screen area `frame`.
+    /// The area is inset by gap/2 and each zone by gap/2, giving `spacing` between zones and at the edges.
+    static func zoneRect(_ zone: Zone, in frame: CGRect, spacing: Double) -> CGRect {
+        let inner = frame.insetBy(dx: spacing / 2, dy: spacing / 2)
+        let rect = zone.rect(in: inner).insetBy(dx: spacing / 2, dy: spacing / 2)
+        // Round each edge (rather than `integral`, which grows the rect) so typed sizes round-trip exactly.
+        let minX = rect.minX.rounded(), minY = rect.minY.rounded()
+        return CGRect(x: minX, y: minY, width: rect.maxX.rounded() - minX, height: rect.maxY.rounded() - minY)
+    }
+
+    /// Inverse of `zoneRect`: the normalized zone that snaps to `rect` (relative to `frame`'s origin).
+    static func zone(for rect: CGRect, in frame: CGRect, spacing: Double, id: UUID) -> Zone {
+        let innerWidth = max(frame.width - spacing, 1)
+        let innerHeight = max(frame.height - spacing, 1)
+        return Zone(
+            id: id,
+            x: (rect.minX - spacing) / innerWidth,
+            y: (rect.minY - spacing) / innerHeight,
+            width: (rect.width + spacing) / innerWidth,
+            height: (rect.height + spacing) / innerHeight
+        )
     }
 }
